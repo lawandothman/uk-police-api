@@ -1,0 +1,11 @@
+[package]
+name = "uk-police-api"
+version = "0.0.1"
+edition = "2024"
+description = "A Rust wrapper for the UK Police API"
+license = "MIT"
+keywords = ["police", "uk", "api", "crime"]
+categories = ["api-bindings"]
+repository = "https://github.com/lawandothman/uk-police-api"
+
+[dependencies]
