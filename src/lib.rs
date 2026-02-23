@@ -26,6 +26,8 @@ pub use client::Client;
 pub use error::Error;
 pub use models::{
     Area, ContactDetails, Coordinate, Crime, CrimeCategory, CrimeLastUpdated, CrimeOutcome,
-    CrimeOutcomes, EngagementMethod, Force, ForceDetail, Location, Outcome, OutcomeCategory,
-    OutcomeDetail, OutcomeStatus, SeniorOfficer, Street,
+    CrimeOutcomes, EngagementMethod, Force, ForceDetail, LatLng, Link, LocateNeighbourhoodResult,
+    Location, Neighbourhood, NeighbourhoodDetail, NeighbourhoodEvent, NeighbourhoodLocation,
+    NeighbourhoodPriority, Outcome, OutcomeCategory, OutcomeDetail, OutcomeStatus, SeniorOfficer,
+    Street,
 };

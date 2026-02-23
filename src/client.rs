@@ -1,7 +1,8 @@
 use crate::error::Error;
 use crate::models::{
-    Area, Crime, CrimeCategory, CrimeLastUpdated, CrimeOutcomes, Force, ForceDetail, Outcome,
-    SeniorOfficer,
+    Area, Crime, CrimeCategory, CrimeLastUpdated, CrimeOutcomes, Force, ForceDetail, LatLng,
+    LocateNeighbourhoodResult, Neighbourhood, NeighbourhoodDetail, NeighbourhoodEvent,
+    NeighbourhoodPriority, Outcome, SeniorOfficer,
 };
 
 const BASE_URL: &str = "https://data.police.uk/api";
@@ -188,6 +189,85 @@ impl Client {
         let url = format!("{}/outcomes-for-crime/{}", self.base_url, persistent_id);
         let outcomes = self.http.get(&url).send().await?.json().await?;
         Ok(outcomes)
+    }
+
+    /// Returns a list of neighbourhoods for a force.
+    pub async fn neighbourhoods(&self, force_id: &str) -> Result<Vec<Neighbourhood>, Error> {
+        let url = format!("{}/{}/neighbourhoods", self.base_url, force_id);
+        let neighbourhoods = self.http.get(&url).send().await?.json().await?;
+        Ok(neighbourhoods)
+    }
+
+    /// Returns details for a specific neighbourhood.
+    pub async fn neighbourhood(
+        &self,
+        force_id: &str,
+        neighbourhood_id: &str,
+    ) -> Result<NeighbourhoodDetail, Error> {
+        let url = format!("{}/{}/{}", self.base_url, force_id, neighbourhood_id);
+        let detail = self.http.get(&url).send().await?.json().await?;
+        Ok(detail)
+    }
+
+    /// Returns the boundary of a neighbourhood as a list of lat/lng pairs.
+    pub async fn neighbourhood_boundary(
+        &self,
+        force_id: &str,
+        neighbourhood_id: &str,
+    ) -> Result<Vec<LatLng>, Error> {
+        let url = format!(
+            "{}/{}/{}/boundary",
+            self.base_url, force_id, neighbourhood_id
+        );
+        let boundary = self.http.get(&url).send().await?.json().await?;
+        Ok(boundary)
+    }
+
+    /// Returns the policing team for a neighbourhood.
+    pub async fn neighbourhood_team(
+        &self,
+        force_id: &str,
+        neighbourhood_id: &str,
+    ) -> Result<Vec<SeniorOfficer>, Error> {
+        let url = format!("{}/{}/{}/people", self.base_url, force_id, neighbourhood_id);
+        let team = self.http.get(&url).send().await?.json().await?;
+        Ok(team)
+    }
+
+    /// Returns events for a neighbourhood.
+    pub async fn neighbourhood_events(
+        &self,
+        force_id: &str,
+        neighbourhood_id: &str,
+    ) -> Result<Vec<NeighbourhoodEvent>, Error> {
+        let url = format!("{}/{}/{}/events", self.base_url, force_id, neighbourhood_id);
+        let events = self.http.get(&url).send().await?.json().await?;
+        Ok(events)
+    }
+
+    /// Returns policing priorities for a neighbourhood.
+    pub async fn neighbourhood_priorities(
+        &self,
+        force_id: &str,
+        neighbourhood_id: &str,
+    ) -> Result<Vec<NeighbourhoodPriority>, Error> {
+        let url = format!(
+            "{}/{}/{}/priorities",
+            self.base_url, force_id, neighbourhood_id
+        );
+        let priorities = self.http.get(&url).send().await?.json().await?;
+        Ok(priorities)
+    }
+
+    /// Locates the neighbourhood policing team responsible for a given point.
+    pub async fn locate_neighbourhood(
+        &self,
+        lat: f64,
+        lng: f64,
+    ) -> Result<LocateNeighbourhoodResult, Error> {
+        let url = format!("{}/locate-neighbourhood?q={},{}", self.base_url, lat, lng);
+        let result = self.http.get(&url).send().await?.json().await?;
+        Ok(result)
     }
 }
 
@@ -596,5 +676,223 @@ mod tests {
             crate::models::OutcomeCategory::NoFurtherAction
         );
         assert!(result.outcomes[0].person_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_neighbourhoods() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/leicestershire/neighbourhoods"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "id": "NC04", "name": "City Centre" },
+                { "id": "NC66", "name": "Cultural Quarter" }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let neighbourhoods = client.neighbourhoods("leicestershire").await.unwrap();
+
+        assert_eq!(neighbourhoods.len(), 2);
+        assert_eq!(neighbourhoods[0].id, "NC04");
+        assert_eq!(neighbourhoods[1].name, "Cultural Quarter");
+    }
+
+    #[tokio::test]
+    async fn test_neighbourhood() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/leicestershire/NC04"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "NC04",
+                "name": "City Centre",
+                "description": "The city centre neighbourhood",
+                "population": "7985",
+                "url_force": "https://www.leics.police.uk/local-policing/city-centre",
+                "contact_details": {
+                    "email": "citycentre@example.com"
+                },
+                "centre": {
+                    "latitude": "52.6389",
+                    "longitude": "-1.1350"
+                },
+                "links": [
+                    { "url": "https://example.com", "title": "Example", "description": null }
+                ],
+                "locations": [
+                    {
+                        "name": "Mansfield House",
+                        "latitude": "52.6352",
+                        "longitude": "-1.1332",
+                        "postcode": "LE1 3GG",
+                        "address": "74 Belgrave Gate",
+                        "telephone": "101",
+                        "type": "station",
+                        "description": null
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let detail = client
+            .neighbourhood("leicestershire", "NC04")
+            .await
+            .unwrap();
+
+        assert_eq!(detail.id, "NC04");
+        assert_eq!(detail.population, Some("7985".to_string()));
+        assert_eq!(detail.centre.latitude, "52.6389");
+        assert_eq!(detail.links.len(), 1);
+        assert_eq!(detail.locations.len(), 1);
+        assert_eq!(detail.locations[0].kind, Some("station".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_neighbourhood_boundary() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/leicestershire/NC04/boundary"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "latitude": "52.6394", "longitude": "-1.1459" },
+                { "latitude": "52.6389", "longitude": "-1.1457" },
+                { "latitude": "52.6381", "longitude": "-1.1447" }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let boundary = client
+            .neighbourhood_boundary("leicestershire", "NC04")
+            .await
+            .unwrap();
+
+        assert_eq!(boundary.len(), 3);
+        assert_eq!(boundary[0].latitude, "52.6394");
+        assert_eq!(boundary[2].longitude, "-1.1447");
+    }
+
+    #[tokio::test]
+    async fn test_neighbourhood_team() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/leicestershire/NC04/people"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "name": "Andy Cooper",
+                    "rank": "Sgt",
+                    "bio": "Andy has been with the force since 2003.",
+                    "contact_details": {}
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let team = client
+            .neighbourhood_team("leicestershire", "NC04")
+            .await
+            .unwrap();
+
+        assert_eq!(team.len(), 1);
+        assert_eq!(team[0].name, "Andy Cooper");
+        assert_eq!(team[0].rank, "Sgt");
+        assert_eq!(
+            team[0].bio,
+            Some("Andy has been with the force since 2003.".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_neighbourhood_events() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/leicestershire/NC04/events"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "title": "Bike Registration",
+                    "description": "Free bike registration event",
+                    "address": "Mansfield House",
+                    "type": "meeting",
+                    "start_date": "2024-09-17T17:00:00",
+                    "end_date": "2024-09-17T19:00:00",
+                    "contact_details": {}
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let events = client
+            .neighbourhood_events("leicestershire", "NC04")
+            .await
+            .unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].title, Some("Bike Registration".to_string()));
+        assert_eq!(events[0].kind, Some("meeting".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_neighbourhood_priorities() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/leicestershire/NC04/priorities"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "action": "Increased patrols in the area.",
+                    "issue-date": "2024-07-01T00:00:00",
+                    "action-date": "2024-09-01T00:00:00",
+                    "issue": "Anti-social behaviour on Granby Street"
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let priorities = client
+            .neighbourhood_priorities("leicestershire", "NC04")
+            .await
+            .unwrap();
+
+        assert_eq!(priorities.len(), 1);
+        assert_eq!(
+            priorities[0].issue,
+            Some("Anti-social behaviour on Granby Street".to_string())
+        );
+        assert_eq!(
+            priorities[0].action,
+            Some("Increased patrols in the area.".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_locate_neighbourhood() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/locate-neighbourhood"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "force": "metropolitan",
+                "neighbourhood": "E05013806N"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let result = client
+            .locate_neighbourhood(51.500617, -0.124629)
+            .await
+            .unwrap();
+
+        assert_eq!(result.force, "metropolitan");
+        assert_eq!(result.neighbourhood, "E05013806N");
     }
 }

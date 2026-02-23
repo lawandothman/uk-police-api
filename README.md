@@ -37,18 +37,37 @@ async fn main() -> Result<(), uk_police_api::Error> {
 
 ## Supported endpoints
 
+### Forces
+
 | Method | Description |
 |--------|-------------|
 | `forces()` | List all police forces |
-| `force(id)` | Get details for a specific force |
-| `senior_officers(force_id)` | List senior officers for a force |
-| `crime_categories(date)` | List crime categories, optionally filtered by date |
-| `crime_last_updated()` | Get the date crime data was last updated |
+| `force(id)` | Details for a specific force |
+| `senior_officers(force_id)` | Senior officers for a force |
+
+### Crimes
+
+| Method | Description |
+|--------|-------------|
 | `street_level_crimes(category, area, date)` | Street-level crimes by point, polygon, or location ID |
 | `crimes_at_location(location_id, date)` | Crimes at a specific location |
 | `crimes_no_location(category, force, date)` | Crimes that could not be mapped to a location |
+| `crime_categories(date)` | List crime categories |
+| `crime_last_updated()` | Date crime data was last updated |
 | `street_level_outcomes(area, date)` | Street-level outcomes by point, polygon, or location ID |
 | `outcomes_for_crime(persistent_id)` | All outcomes for a specific crime |
+
+### Neighbourhoods
+
+| Method | Description |
+|--------|-------------|
+| `neighbourhoods(force_id)` | List neighbourhoods for a force |
+| `neighbourhood(force_id, neighbourhood_id)` | Details for a specific neighbourhood |
+| `neighbourhood_boundary(force_id, neighbourhood_id)` | Boundary coordinates for a neighbourhood |
+| `neighbourhood_team(force_id, neighbourhood_id)` | Team members for a neighbourhood |
+| `neighbourhood_events(force_id, neighbourhood_id)` | Events for a neighbourhood |
+| `neighbourhood_priorities(force_id, neighbourhood_id)` | Policing priorities for a neighbourhood |
+| `locate_neighbourhood(lat, lng)` | Find the neighbourhood responsible for a point |
 
 ## License
 
