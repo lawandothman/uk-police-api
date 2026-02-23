@@ -2,11 +2,14 @@
 name = "uk-police-api"
 version = "0.4.0"
 edition = "2024"
+rust-version = "1.85"
 description = "A Rust wrapper for the UK Police API"
 license = "MIT"
+authors = ["Lawand Othman <lwnd@pm.me>"]
 keywords = ["police", "uk", "api", "crime"]
 categories = ["api-bindings"]
 repository = "https://github.com/lawandothman/uk-police-api"
+documentation = "https://docs.rs/uk-police-api"
 readme = "README.md"
 
 [dependencies]
