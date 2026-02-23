@@ -1,14 +1,28 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! # uk-police-api
+//!
+//! An async Rust client for the [UK Police API](https://data.police.uk/docs/).
+//!
+//! Provides access to police force information, crime categories, and crime data
+//! availability across England, Wales, and Northern Ireland.
+//!
+//! # Example
+//!
+//! ```no_run
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), uk_police_api::Error> {
+//! let client = uk_police_api::Client::new();
+//!
+//! let forces = client.forces().await?;
+//! let met = client.force("metropolitan").await?;
+//! let categories = client.crime_categories(None).await?;
+//! # Ok(())
+//! # }
+//! ```
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod client;
+mod error;
+pub mod models;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use client::Client;
+pub use error::Error;
+pub use models::{CrimeCategory, CrimeLastUpdated, EngagementMethod, Force, ForceDetail};
