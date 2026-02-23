@@ -9,7 +9,7 @@ pub struct CrimeCategory {
     pub name: String,
 }
 
-/// The date when crime data was last updated 
+/// The date when crime data was last updated
 #[derive(Debug, Deserialize)]
 pub struct CrimeLastUpdated {
     /// Month of the latest crime data in ISO date format.
