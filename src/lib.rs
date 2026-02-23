@@ -25,6 +25,7 @@ pub mod models;
 pub use client::Client;
 pub use error::Error;
 pub use models::{
-    Area, Coordinate, Crime, CrimeCategory, CrimeLastUpdated, EngagementMethod, Force, ForceDetail,
-    Location, Outcome, OutcomeCategory, OutcomeCrime, OutcomeDetail, OutcomeStatus, Street,
+    Area, ContactDetails, Coordinate, Crime, CrimeCategory, CrimeLastUpdated, CrimeOutcome,
+    CrimeOutcomes, EngagementMethod, Force, ForceDetail, Location, Outcome, OutcomeCategory,
+    OutcomeDetail, OutcomeStatus, SeniorOfficer, Street,
 };

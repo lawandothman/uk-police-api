@@ -35,7 +35,7 @@ pub struct CrimeLastUpdated {
     pub date: String,
 }
 
-/// A street-level crime record.
+/// A crime record.
 #[derive(Debug, Deserialize)]
 pub struct Crime {
     /// Crime category (e.g. "anti-social-behaviour", "burglary").
@@ -46,14 +46,14 @@ pub struct Crime {
     pub location_subtype: String,
     /// API identifier for the crime. Not a police identifier.
     pub id: u64,
-    /// Approximate location of the incident.
-    pub location: Location,
+    /// Approximate location of the incident. `None` for crimes with no location.
+    pub location: Option<Location>,
     /// Extra information about the crime (if applicable).
     pub context: String,
     /// Month the crime was recorded (format: `YYYY-MM`).
     pub month: String,
-    /// Either "Force" or "BTP" (British Transport Police).
-    pub location_type: String,
+    /// Either "Force" or "BTP" (British Transport Police). `None` for crimes with no location.
+    pub location_type: Option<String>,
     /// The latest recorded outcome for the crime, if available.
     pub outcome_status: Option<OutcomeStatus>,
 }
@@ -78,7 +78,7 @@ pub struct Street {
     pub name: String,
 }
 
-/// The outcome of a crime.
+/// The latest outcome of a crime.
 #[derive(Debug, Deserialize)]
 pub struct OutcomeStatus {
     /// Category of the outcome.
@@ -203,6 +203,16 @@ pub enum OutcomeCategory {
     StatusUpdateUnavailable,
 }
 
+/// Outcome category detail object returned by outcome endpoints.
+/// Contains both the machine-readable code and human-readable name.
+#[derive(Debug, Deserialize)]
+pub struct OutcomeDetail {
+    /// Machine-readable category code.
+    pub code: OutcomeCategory,
+    /// Human-readable category name.
+    pub name: String,
+}
+
 /// A street-level outcome record.
 #[derive(Debug, Deserialize)]
 pub struct Outcome {
@@ -213,35 +223,25 @@ pub struct Outcome {
     /// Identifier for the suspect/offender, where available.
     pub person_id: Option<String>,
     /// The crime this outcome relates to.
-    pub crime: OutcomeCrime,
+    pub crime: Crime,
 }
 
-/// The category detail of an outcome, containing both code and display name.
+/// All outcomes for a specific crime.
 #[derive(Debug, Deserialize)]
-pub struct OutcomeDetail {
-    /// Outcome code.
-    pub code: OutcomeCategory,
-    /// Human-readable name.
-    pub name: String,
+pub struct CrimeOutcomes {
+    /// The crime.
+    pub crime: Crime,
+    /// List of outcomes for this crime.
+    pub outcomes: Vec<CrimeOutcome>,
 }
 
-/// Crime information as returned within an outcome record.
+/// An individual outcome within a [`CrimeOutcomes`] response.
 #[derive(Debug, Deserialize)]
-pub struct OutcomeCrime {
-    /// Crime category (e.g. "violent-crime", "public-order").
-    pub category: String,
-    /// 64-character unique identifier for the crime.
-    pub persistent_id: String,
-    /// For BTP locations, the type of location at which this crime was recorded.
-    pub location_subtype: String,
-    /// Either "Force" or "BTP" (British Transport Police).
-    pub location_type: String,
-    /// Approximate location of the incident.
-    pub location: Location,
-    /// Extra information about the crime (if applicable).
-    pub context: String,
-    /// Month the crime was recorded (format: `YYYY-MM`).
-    pub month: String,
-    /// API identifier for the crime. Not a police identifier.
-    pub id: u64,
+pub struct CrimeOutcome {
+    /// The outcome category.
+    pub category: OutcomeDetail,
+    /// Date of the outcome (format: `YYYY-MM`).
+    pub date: String,
+    /// Identifier for the suspect/offender, where available.
+    pub person_id: Option<String>,
 }

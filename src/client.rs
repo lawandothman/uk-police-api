@@ -1,5 +1,8 @@
 use crate::error::Error;
-use crate::models::{Area, Crime, CrimeCategory, CrimeLastUpdated, Force, ForceDetail, Outcome};
+use crate::models::{
+    Area, Crime, CrimeCategory, CrimeLastUpdated, CrimeOutcomes, Force, ForceDetail, Outcome,
+    SeniorOfficer,
+};
 
 const BASE_URL: &str = "https://data.police.uk/api";
 
@@ -121,6 +124,70 @@ impl Client {
         let url = format!("{}/crime-last-updated", self.base_url);
         let updated = self.http.get(&url).send().await?.json().await?;
         Ok(updated)
+    }
+
+    /// Returns a list of senior officers for a given force.
+    pub async fn senior_officers(&self, force_id: &str) -> Result<Vec<SeniorOfficer>, Error> {
+        let url = format!("{}/forces/{}/people", self.base_url, force_id);
+        let officers = self.http.get(&url).send().await?.json().await?;
+        Ok(officers)
+    }
+
+    /// Returns crimes at a specific location.
+    ///
+    /// # Arguments
+    ///
+    /// * `location_id` - A location ID (from a street's `id` field).
+    /// * `date` - Optional month filter (format: `YYYY-MM`). Defaults to the latest available.
+    pub async fn crimes_at_location(
+        &self,
+        location_id: u64,
+        date: Option<&str>,
+    ) -> Result<Vec<Crime>, Error> {
+        let mut url = format!(
+            "{}/crimes-at-location?location_id={}",
+            self.base_url, location_id
+        );
+        if let Some(date) = date {
+            url.push_str(&format!("&date={date}"));
+        }
+        let crimes = self.http.get(&url).send().await?.json().await?;
+        Ok(crimes)
+    }
+
+    /// Returns crimes that could not be mapped to a location.
+    ///
+    /// # Arguments
+    ///
+    /// * `category` - Crime category slug (e.g. "all-crime"). See [`Client::crime_categories`].
+    /// * `force` - Force identifier (e.g. "metropolitan").
+    /// * `date` - Optional month filter (format: `YYYY-MM`). Defaults to the latest available.
+    pub async fn crimes_no_location(
+        &self,
+        category: &str,
+        force: &str,
+        date: Option<&str>,
+    ) -> Result<Vec<Crime>, Error> {
+        let mut url = format!(
+            "{}/crimes-no-location?category={}&force={}",
+            self.base_url, category, force
+        );
+        if let Some(date) = date {
+            url.push_str(&format!("&date={date}"));
+        }
+        let crimes = self.http.get(&url).send().await?.json().await?;
+        Ok(crimes)
+    }
+
+    /// Returns all outcomes for a specific crime.
+    ///
+    /// # Arguments
+    ///
+    /// * `persistent_id` - The 64-character crime identifier.
+    pub async fn outcomes_for_crime(&self, persistent_id: &str) -> Result<CrimeOutcomes, Error> {
+        let url = format!("{}/outcomes-for-crime/{}", self.base_url, persistent_id);
+        let outcomes = self.http.get(&url).send().await?.json().await?;
+        Ok(outcomes)
     }
 }
 
@@ -261,7 +328,10 @@ mod tests {
 
         assert_eq!(crimes.len(), 1);
         assert_eq!(crimes[0].category, "anti-social-behaviour");
-        assert_eq!(crimes[0].location.street.name, "On or near Campbell Street");
+        assert_eq!(
+            crimes[0].location.as_ref().unwrap().street.name,
+            "On or near Campbell Street"
+        );
         assert_eq!(
             crimes[0].outcome_status.as_ref().unwrap().category,
             crate::models::OutcomeCategory::NoFurtherAction
@@ -387,5 +457,144 @@ mod tests {
         let updated = client.crime_last_updated().await.unwrap();
 
         assert_eq!(updated.date, "2025-12-01");
+    }
+
+    #[tokio::test]
+    async fn test_senior_officers() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/forces/metropolitan/people"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "name": "Mark Rowley",
+                    "rank": "Commissioner",
+                    "bio": null,
+                    "contact_details": {
+                        "twitter": "https://x.com/metpoliceuk"
+                    }
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let officers = client.senior_officers("metropolitan").await.unwrap();
+
+        assert_eq!(officers.len(), 1);
+        assert_eq!(officers[0].name, "Mark Rowley");
+        assert_eq!(officers[0].rank, "Commissioner");
+        assert!(officers[0].bio.is_none());
+        assert_eq!(
+            officers[0].contact_details.twitter,
+            Some("https://x.com/metpoliceuk".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_crimes_at_location() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/crimes-at-location"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(mock_crime_json()))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let crimes = client
+            .crimes_at_location(1738842, Some("2024-01"))
+            .await
+            .unwrap();
+
+        assert_eq!(crimes.len(), 1);
+        assert_eq!(crimes[0].category, "anti-social-behaviour");
+    }
+
+    #[tokio::test]
+    async fn test_crimes_no_location() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/crimes-no-location"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "category": "burglary",
+                    "persistent_id": "abc123",
+                    "location_subtype": "",
+                    "id": 999,
+                    "location": null,
+                    "context": "",
+                    "month": "2024-01",
+                    "location_type": null,
+                    "outcome_status": null
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let crimes = client
+            .crimes_no_location("burglary", "metropolitan", Some("2024-01"))
+            .await
+            .unwrap();
+
+        assert_eq!(crimes.len(), 1);
+        assert_eq!(crimes[0].category, "burglary");
+        assert!(crimes[0].location.is_none());
+        assert!(crimes[0].location_type.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_outcomes_for_crime() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path(
+                "/outcomes-for-crime/dd6e56f90d1bdd7bc7482af17852369f263203d9a688fac42ec53bf48485d8f1",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "crime": {
+                    "category": "violent-crime",
+                    "persistent_id": "dd6e56f90d1bdd7bc7482af17852369f263203d9a688fac42ec53bf48485d8f1",
+                    "location_subtype": "",
+                    "id": 116202605,
+                    "location": {
+                        "latitude": "52.637146",
+                        "street": { "id": 1737432, "name": "On or near Vaughan Street" },
+                        "longitude": "-1.149381"
+                    },
+                    "context": "",
+                    "month": "2024-01",
+                    "location_type": "Force",
+                    "outcome_status": null
+                },
+                "outcomes": [
+                    {
+                        "category": {
+                            "code": "no-further-action",
+                            "name": "Investigation complete; no suspect identified"
+                        },
+                        "date": "2024-01",
+                        "person_id": null
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let result = client
+            .outcomes_for_crime("dd6e56f90d1bdd7bc7482af17852369f263203d9a688fac42ec53bf48485d8f1")
+            .await
+            .unwrap();
+
+        assert_eq!(result.crime.category, "violent-crime");
+        assert_eq!(result.outcomes.len(), 1);
+        assert_eq!(
+            result.outcomes[0].category.code,
+            crate::models::OutcomeCategory::NoFurtherAction
+        );
+        assert!(result.outcomes[0].person_id.is_none());
     }
 }

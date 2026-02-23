@@ -41,10 +41,14 @@ async fn main() -> Result<(), uk_police_api::Error> {
 |--------|-------------|
 | `forces()` | List all police forces |
 | `force(id)` | Get details for a specific force |
+| `senior_officers(force_id)` | List senior officers for a force |
 | `crime_categories(date)` | List crime categories, optionally filtered by date |
 | `crime_last_updated()` | Get the date crime data was last updated |
 | `street_level_crimes(category, area, date)` | Street-level crimes by point, polygon, or location ID |
+| `crimes_at_location(location_id, date)` | Crimes at a specific location |
+| `crimes_no_location(category, force, date)` | Crimes that could not be mapped to a location |
 | `street_level_outcomes(area, date)` | Street-level outcomes by point, polygon, or location ID |
+| `outcomes_for_crime(persistent_id)` | All outcomes for a specific crime |
 
 ## License
 
