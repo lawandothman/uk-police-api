@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::models::{
     Area, Crime, CrimeCategory, CrimeLastUpdated, CrimeOutcomes, Force, ForceDetail, LatLng,
     LocateNeighbourhoodResult, Neighbourhood, NeighbourhoodDetail, NeighbourhoodEvent,
-    NeighbourhoodPriority, Outcome, SeniorOfficer,
+    NeighbourhoodPriority, Outcome, SeniorOfficer, StopAndSearch,
 };
 
 const BASE_URL: &str = "https://data.police.uk/api";
@@ -268,6 +268,85 @@ impl Client {
         let url = format!("{}/locate-neighbourhood?q={},{}", self.base_url, lat, lng);
         let result = self.http.get(&url).send().await?.json().await?;
         Ok(result)
+    }
+
+    /// Returns stop and searches within a given area.
+    ///
+    /// # Arguments
+    ///
+    /// * `area` - A point (1 mile radius) or custom polygon.
+    /// * `date` - Optional month filter (format: `YYYY-MM`). Defaults to the latest available.
+    pub async fn stops_street(
+        &self,
+        area: &Area,
+        date: Option<&str>,
+    ) -> Result<Vec<StopAndSearch>, Error> {
+        let mut url = format!("{}/stops-street?{}", self.base_url, Self::area_query(area));
+        if let Some(date) = date {
+            url.push_str(&format!("&date={date}"));
+        }
+        let stops = self.http.get(&url).send().await?.json().await?;
+        Ok(stops)
+    }
+
+    /// Returns stop and searches at a specific location.
+    ///
+    /// # Arguments
+    ///
+    /// * `location_id` - A location ID (from a street's `id` field).
+    /// * `date` - Optional month filter (format: `YYYY-MM`). Defaults to the latest available.
+    pub async fn stops_at_location(
+        &self,
+        location_id: u64,
+        date: Option<&str>,
+    ) -> Result<Vec<StopAndSearch>, Error> {
+        let mut url = format!(
+            "{}/stops-at-location?location_id={}",
+            self.base_url, location_id
+        );
+        if let Some(date) = date {
+            url.push_str(&format!("&date={date}"));
+        }
+        let stops = self.http.get(&url).send().await?.json().await?;
+        Ok(stops)
+    }
+
+    /// Returns stop and searches that could not be mapped to a location.
+    ///
+    /// # Arguments
+    ///
+    /// * `force` - Force identifier (e.g. "metropolitan").
+    /// * `date` - Optional month filter (format: `YYYY-MM`). Defaults to the latest available.
+    pub async fn stops_no_location(
+        &self,
+        force: &str,
+        date: Option<&str>,
+    ) -> Result<Vec<StopAndSearch>, Error> {
+        let mut url = format!("{}/stops-no-location?force={}", self.base_url, force);
+        if let Some(date) = date {
+            url.push_str(&format!("&date={date}"));
+        }
+        let stops = self.http.get(&url).send().await?.json().await?;
+        Ok(stops)
+    }
+
+    /// Returns stop and searches reported by a force.
+    ///
+    /// # Arguments
+    ///
+    /// * `force` - Force identifier (e.g. "metropolitan").
+    /// * `date` - Optional month filter (format: `YYYY-MM`). Defaults to the latest available.
+    pub async fn stops_force(
+        &self,
+        force: &str,
+        date: Option<&str>,
+    ) -> Result<Vec<StopAndSearch>, Error> {
+        let mut url = format!("{}/stops-force?force={}", self.base_url, force);
+        if let Some(date) = date {
+            url.push_str(&format!("&date={date}"));
+        }
+        let stops = self.http.get(&url).send().await?.json().await?;
+        Ok(stops)
     }
 }
 
@@ -894,5 +973,181 @@ mod tests {
 
         assert_eq!(result.force, "metropolitan");
         assert_eq!(result.neighbourhood, "E05013806N");
+    }
+
+    fn mock_stop_json() -> serde_json::Value {
+        serde_json::json!([{
+            "type": "Person search",
+            "involved_person": true,
+            "datetime": "2024-01-15T12:30:00+00:00",
+            "operation": false,
+            "operation_name": null,
+            "location": {
+                "latitude": "52.634407",
+                "street": { "id": 1737432, "name": "On or near Vaughan Street" },
+                "longitude": "-1.149381"
+            },
+            "gender": "Male",
+            "age_range": "18-24",
+            "self_defined_ethnicity": "White - English/Welsh/Scottish/Northern Irish/British",
+            "officer_defined_ethnicity": "White",
+            "legislation": "Misuse of Drugs Act 1971 (section 23)",
+            "object_of_search": "Controlled drugs",
+            "outcome": "A no further action disposal",
+            "outcome_linked_to_object_of_search": null,
+            "removal_of_more_than_outer_clothing": false
+        }])
+    }
+
+    #[tokio::test]
+    async fn test_stops_street() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/stops-street"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(mock_stop_json()))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let area = Area::Point(Coordinate {
+            lat: 52.629729,
+            lng: -1.131592,
+        });
+        let stops = client.stops_street(&area, Some("2024-01")).await.unwrap();
+
+        assert_eq!(stops.len(), 1);
+        assert_eq!(
+            stops[0].kind,
+            Some(crate::models::StopAndSearchType::Person)
+        );
+        assert_eq!(stops[0].involved_person, Some(true));
+        assert_eq!(stops[0].gender, Some("Male".to_string()));
+        assert_eq!(
+            stops[0].outcome,
+            Some("A no further action disposal".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stops_at_location() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/stops-at-location"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(mock_stop_json()))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let stops = client
+            .stops_at_location(1737432, Some("2024-01"))
+            .await
+            .unwrap();
+
+        assert_eq!(stops.len(), 1);
+        assert_eq!(
+            stops[0].object_of_search,
+            Some("Controlled drugs".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stops_no_location() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/stops-no-location"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!([{
+                    "type": "Vehicle search",
+                    "involved_person": false,
+                    "datetime": "2024-01-10T08:00:00+00:00",
+                    "operation": null,
+                    "operation_name": null,
+                    "location": null,
+                    "gender": null,
+                    "age_range": null,
+                    "self_defined_ethnicity": null,
+                    "officer_defined_ethnicity": null,
+                    "legislation": "Misuse of Drugs Act 1971 (section 23)",
+                    "object_of_search": "Controlled drugs",
+                    "outcome": false,
+                    "outcome_linked_to_object_of_search": null,
+                    "removal_of_more_than_outer_clothing": null
+                }])),
+            )
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let stops = client
+            .stops_no_location("leicestershire", Some("2024-01"))
+            .await
+            .unwrap();
+
+        assert_eq!(stops.len(), 1);
+        assert_eq!(
+            stops[0].kind,
+            Some(crate::models::StopAndSearchType::Vehicle)
+        );
+        assert!(stops[0].location.is_none());
+        assert!(stops[0].outcome.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_stops_force() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/stops-force"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!([{
+                    "type": "Person and Vehicle search",
+                    "involved_person": true,
+                    "datetime": "2024-01-20T14:00:00+00:00",
+                    "operation": true,
+                    "operation_name": "Operation Blitz",
+                    "location": {
+                        "latitude": "52.634407",
+                        "street": { "id": 1737432, "name": "On or near Vaughan Street" },
+                        "longitude": "-1.149381"
+                    },
+                    "gender": "Female",
+                    "age_range": "25-34",
+                    "self_defined_ethnicity": null,
+                    "officer_defined_ethnicity": "Black",
+                    "legislation": "Police and Criminal Evidence Act 1984 (section 1)",
+                    "object_of_search": "Stolen goods",
+                    "outcome": "Arrest",
+                    "outcome_object": {
+                        "id": "bu-arrest",
+                        "name": "Arrest"
+                    },
+                    "outcome_linked_to_object_of_search": true,
+                    "removal_of_more_than_outer_clothing": false
+                }])),
+            )
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let stops = client
+            .stops_force("leicestershire", Some("2024-01"))
+            .await
+            .unwrap();
+
+        assert_eq!(stops.len(), 1);
+        assert_eq!(
+            stops[0].kind,
+            Some(crate::models::StopAndSearchType::PersonAndVehicle)
+        );
+        assert_eq!(stops[0].operation, Some(true));
+        assert_eq!(stops[0].operation_name, Some("Operation Blitz".to_string()));
+        assert_eq!(stops[0].outcome, Some("Arrest".to_string()));
+        assert_eq!(
+            stops[0].outcome_object.as_ref().unwrap().name,
+            Some("Arrest".to_string())
+        );
     }
 }

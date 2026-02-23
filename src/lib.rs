@@ -28,6 +28,6 @@ pub use models::{
     Area, ContactDetails, Coordinate, Crime, CrimeCategory, CrimeLastUpdated, CrimeOutcome,
     CrimeOutcomes, EngagementMethod, Force, ForceDetail, LatLng, Link, LocateNeighbourhoodResult,
     Location, Neighbourhood, NeighbourhoodDetail, NeighbourhoodEvent, NeighbourhoodLocation,
-    NeighbourhoodPriority, Outcome, OutcomeCategory, OutcomeDetail, OutcomeStatus, SeniorOfficer,
-    Street,
+    NeighbourhoodPriority, Outcome, OutcomeCategory, OutcomeDetail, OutcomeObject, OutcomeStatus,
+    SeniorOfficer, StopAndSearch, StopAndSearchType, Street,
 };

@@ -69,6 +69,15 @@ async fn main() -> Result<(), uk_police_api::Error> {
 | `neighbourhood_priorities(force_id, neighbourhood_id)` | Policing priorities for a neighbourhood |
 | `locate_neighbourhood(lat, lng)` | Find the neighbourhood responsible for a point |
 
+### Stop and search
+
+| Method | Description |
+|--------|-------------|
+| `stops_street(area, date)` | Stop and searches by area (point or polygon) |
+| `stops_at_location(location_id, date)` | Stop and searches at a specific location |
+| `stops_no_location(force, date)` | Stop and searches that could not be mapped to a location |
+| `stops_force(force, date)` | Stop and searches reported by a force |
+
 ## License
 
 MIT
