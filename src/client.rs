@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::models::{CrimeCategory, CrimeLastUpdated, Force, ForceDetail};
+use crate::models::{Area, Crime, CrimeCategory, CrimeLastUpdated, Force, ForceDetail};
 
 const BASE_URL: &str = "https://data.police.uk/api";
 
@@ -52,6 +52,39 @@ impl Client {
         Ok(categories)
     }
 
+    /// Returns street-level crimes within a given area.
+    ///
+    /// # Arguments
+    ///
+    /// * `category` - Crime category slug (e.g. "all-crime", "burglary"). See [`Client::crime_categories`].
+    /// * `area` - Either a point (1 mile radius) or a custom polygon.
+    /// * `date` - Optional month filter (format: `YYYY-MM`). Defaults to the latest available.
+    pub async fn street_level_crimes(
+        &self,
+        category: &str,
+        area: &Area,
+        date: Option<&str>,
+    ) -> Result<Vec<Crime>, Error> {
+        let mut url = format!("{}/crimes-street/{}", self.base_url, category);
+        let query = match area {
+            Area::Point(coord) => format!("lat={}&lng={}", coord.lat, coord.lng),
+            Area::Custom(coords) => {
+                let poly = coords
+                    .iter()
+                    .map(|c| format!("{},{}", c.lat, c.lng))
+                    .collect::<Vec<_>>()
+                    .join(":");
+                format!("poly={poly}")
+            }
+        };
+        url.push_str(&format!("?{query}"));
+        if let Some(date) = date {
+            url.push_str(&format!("&date={date}"));
+        }
+        let crimes = self.http.get(&url).send().await?.json().await?;
+        Ok(crimes)
+    }
+
     /// Returns the date when crime data was last updated.
     pub async fn crime_last_updated(&self) -> Result<CrimeLastUpdated, Error> {
         let url = format!("{}/crime-last-updated", self.base_url);
@@ -69,6 +102,7 @@ impl Default for Client {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::Coordinate;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -151,6 +185,84 @@ mod tests {
 
         assert_eq!(categories.len(), 2);
         assert_eq!(categories[0].url, "burglary");
+    }
+
+    fn mock_crime_json() -> serde_json::Value {
+        serde_json::json!([{
+            "category": "anti-social-behaviour",
+            "persistent_id": "",
+            "location_subtype": "",
+            "id": 116208998,
+            "location": {
+                "latitude": "52.632805",
+                "street": { "id": 1738842, "name": "On or near Campbell Street" },
+                "longitude": "-1.124819"
+            },
+            "context": "",
+            "month": "2024-01",
+            "location_type": "Force",
+            "outcome_status": null
+        }])
+    }
+
+    #[tokio::test]
+    async fn test_street_level_crimes_by_point() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/crimes-street/all-crime"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(mock_crime_json()))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let area = Area::Point(Coordinate {
+            lat: 52.629729,
+            lng: -1.131592,
+        });
+        let crimes = client
+            .street_level_crimes("all-crime", &area, Some("2024-01"))
+            .await
+            .unwrap();
+
+        assert_eq!(crimes.len(), 1);
+        assert_eq!(crimes[0].category, "anti-social-behaviour");
+        assert_eq!(crimes[0].location.street.name, "On or near Campbell Street");
+        assert!(crimes[0].outcome_status.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_street_level_crimes_by_area() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/crimes-street/all-crime"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(mock_crime_json()))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let area = Area::Custom(vec![
+            Coordinate {
+                lat: 52.268,
+                lng: 0.543,
+            },
+            Coordinate {
+                lat: 52.794,
+                lng: 0.238,
+            },
+            Coordinate {
+                lat: 52.130,
+                lng: 0.478,
+            },
+        ]);
+        let crimes = client
+            .street_level_crimes("all-crime", &area, None)
+            .await
+            .unwrap();
+
+        assert_eq!(crimes.len(), 1);
+        assert_eq!(crimes[0].id, 116208998);
     }
 
     #[tokio::test]
