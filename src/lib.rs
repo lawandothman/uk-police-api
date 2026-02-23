@@ -2,19 +2,18 @@
 //!
 //! An async Rust client for the [UK Police API](https://data.police.uk/docs/).
 //!
-//! Provides access to police force information, crime categories, and crime data
-//! availability across England, Wales, and Northern Ireland.
-//!
 //! # Example
 //!
 //! ```no_run
+//! use uk_police_api::{Client, Area, Coordinate};
+//!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), uk_police_api::Error> {
-//! let client = uk_police_api::Client::new();
+//! let client = Client::new();
 //!
-//! let forces = client.forces().await?;
-//! let met = client.force("metropolitan").await?;
-//! let categories = client.crime_categories(None).await?;
+//! // What crimes happened near Big Ben last month?
+//! let area = Area::Point(Coordinate { lat: 51.5007, lng: -0.1246 });
+//! let crimes = client.street_level_crimes("all-crime", &area, None).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -27,5 +26,5 @@ pub use client::Client;
 pub use error::Error;
 pub use models::{
     Area, Coordinate, Crime, CrimeCategory, CrimeLastUpdated, EngagementMethod, Force, ForceDetail,
-    Location, OutcomeStatus, Street,
+    Location, Outcome, OutcomeCategory, OutcomeCrime, OutcomeDetail, OutcomeStatus, Street,
 };

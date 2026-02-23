@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::models::{Area, Crime, CrimeCategory, CrimeLastUpdated, Force, ForceDetail};
+use crate::models::{Area, Crime, CrimeCategory, CrimeLastUpdated, Force, ForceDetail, Outcome};
 
 const BASE_URL: &str = "https://data.police.uk/api";
 
@@ -21,6 +21,21 @@ pub struct Client {
 }
 
 impl Client {
+    fn area_query(area: &Area) -> String {
+        match area {
+            Area::Point(coord) => format!("lat={}&lng={}", coord.lat, coord.lng),
+            Area::Custom(coords) => {
+                let poly = coords
+                    .iter()
+                    .map(|c| format!("{},{}", c.lat, c.lng))
+                    .collect::<Vec<_>>()
+                    .join(":");
+                format!("poly={poly}")
+            }
+            Area::LocationId(id) => format!("location_id={id}"),
+        }
+    }
+
     pub fn new() -> Self {
         Self {
             http: reqwest::Client::new(),
@@ -65,24 +80,40 @@ impl Client {
         area: &Area,
         date: Option<&str>,
     ) -> Result<Vec<Crime>, Error> {
-        let mut url = format!("{}/crimes-street/{}", self.base_url, category);
-        let query = match area {
-            Area::Point(coord) => format!("lat={}&lng={}", coord.lat, coord.lng),
-            Area::Custom(coords) => {
-                let poly = coords
-                    .iter()
-                    .map(|c| format!("{},{}", c.lat, c.lng))
-                    .collect::<Vec<_>>()
-                    .join(":");
-                format!("poly={poly}")
-            }
-        };
-        url.push_str(&format!("?{query}"));
+        let mut url = format!(
+            "{}/crimes-street/{}?{}",
+            self.base_url,
+            category,
+            Self::area_query(area)
+        );
         if let Some(date) = date {
             url.push_str(&format!("&date={date}"));
         }
         let crimes = self.http.get(&url).send().await?.json().await?;
         Ok(crimes)
+    }
+
+    /// Returns street-level outcomes at a given location.
+    ///
+    /// # Arguments
+    ///
+    /// * `area` - A point (1 mile radius), custom polygon, or specific location ID.
+    /// * `date` - Optional month filter (format: `YYYY-MM`). Defaults to the latest available.
+    pub async fn street_level_outcomes(
+        &self,
+        area: &Area,
+        date: Option<&str>,
+    ) -> Result<Vec<Outcome>, Error> {
+        let mut url = format!(
+            "{}/outcomes-at-location?{}",
+            self.base_url,
+            Self::area_query(area)
+        );
+        if let Some(date) = date {
+            url.push_str(&format!("&date={date}"));
+        }
+        let outcomes = self.http.get(&url).send().await?.json().await?;
+        Ok(outcomes)
     }
 
     /// Returns the date when crime data was last updated.
@@ -201,7 +232,10 @@ mod tests {
             "context": "",
             "month": "2024-01",
             "location_type": "Force",
-            "outcome_status": null
+            "outcome_status": {
+                "category": "Investigation complete; no suspect identified",
+                "date": "2024-01"
+            }
         }])
     }
 
@@ -228,7 +262,10 @@ mod tests {
         assert_eq!(crimes.len(), 1);
         assert_eq!(crimes[0].category, "anti-social-behaviour");
         assert_eq!(crimes[0].location.street.name, "On or near Campbell Street");
-        assert!(crimes[0].outcome_status.is_none());
+        assert_eq!(
+            crimes[0].outcome_status.as_ref().unwrap().category,
+            crate::models::OutcomeCategory::NoFurtherAction
+        );
     }
 
     #[tokio::test]
@@ -263,6 +300,74 @@ mod tests {
 
         assert_eq!(crimes.len(), 1);
         assert_eq!(crimes[0].id, 116208998);
+    }
+
+    #[tokio::test]
+    async fn test_street_level_outcomes_by_location_id() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/outcomes-at-location"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "category": {
+                        "code": "local-resolution",
+                        "name": "Local resolution"
+                    },
+                    "date": "2024-01",
+                    "person_id": null,
+                    "crime": {
+                        "category": "public-order",
+                        "persistent_id": "dd6e56f90d1bdd7bc7482af17852369f263203d9a688fac42ec53bf48485d8f1",
+                        "location_subtype": "ROAD",
+                        "location_type": "Force",
+                        "location": {
+                            "latitude": "52.637146",
+                            "street": { "id": 1737432, "name": "On or near Vaughan Street" },
+                            "longitude": "-1.149381"
+                        },
+                        "context": "",
+                        "month": "2024-01",
+                        "id": 116202605
+                    }
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let outcomes = client
+            .street_level_outcomes(&Area::LocationId(1737432), Some("2024-01"))
+            .await
+            .unwrap();
+
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(
+            outcomes[0].category.code,
+            crate::models::OutcomeCategory::LocalResolution
+        );
+        assert_eq!(outcomes[0].crime.category, "public-order");
+        assert!(outcomes[0].person_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_street_level_outcomes_by_point() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/outcomes-at-location"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([])))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let area = Area::Point(Coordinate {
+            lat: 52.629729,
+            lng: -1.131592,
+        });
+        let outcomes = client.street_level_outcomes(&area, None).await.unwrap();
+
+        assert!(outcomes.is_empty());
     }
 
     #[tokio::test]

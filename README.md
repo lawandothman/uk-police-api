@@ -2,8 +2,6 @@
 
 An async Rust client for the [UK Police API](https://data.police.uk/docs/).
 
-Provides access to police force information, crime categories, and crime data availability across England, Wales, and Northern Ireland.
-
 ## Installation
 
 ```toml
@@ -14,7 +12,7 @@ uk-police-api = "0.1"
 ## Usage
 
 ```rust
-use uk_police_api::Client;
+use uk_police_api::{Client, Area, Coordinate};
 
 #[tokio::main]
 async fn main() -> Result<(), uk_police_api::Error> {
@@ -22,23 +20,16 @@ async fn main() -> Result<(), uk_police_api::Error> {
 
     // List all police forces
     let forces = client.forces().await?;
-    for force in &forces {
-        println!("{}: {}", force.id, force.name);
-    }
 
     // Get details for a specific force
     let met = client.force("metropolitan").await?;
-    println!("{} - {}", met.name, met.telephone.unwrap_or_default());
 
-    // List crime categories
-    let categories = client.crime_categories(Some("2024-01")).await?;
-    for category in &categories {
-        println!("{}: {}", category.url, category.name);
-    }
+    // Street-level crimes near a point
+    let area = Area::Point(Coordinate { lat: 52.629729, lng: -1.131592 });
+    let crimes = client.street_level_crimes("all-crime", &area, Some("2024-01")).await?;
 
-    // Check when crime data was last updated
-    let updated = client.crime_last_updated().await?;
-    println!("Last updated: {}", updated.date);
+    // Outcomes at a location
+    let outcomes = client.street_level_outcomes(&area, Some("2024-01")).await?;
 
     Ok(())
 }
@@ -52,6 +43,8 @@ async fn main() -> Result<(), uk_police_api::Error> {
 | `force(id)` | Get details for a specific force |
 | `crime_categories(date)` | List crime categories, optionally filtered by date |
 | `crime_last_updated()` | Get the date crime data was last updated |
+| `street_level_crimes(category, area, date)` | Street-level crimes by point, polygon, or location ID |
+| `street_level_outcomes(area, date)` | Street-level outcomes by point, polygon, or location ID |
 
 ## License
 
