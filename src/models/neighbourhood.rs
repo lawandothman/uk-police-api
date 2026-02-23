@@ -1,9 +1,9 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::force::ContactDetails;
 
 /// A neighbourhood summary.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Neighbourhood {
     /// Force-specific neighbourhood identifier.
     /// Note: this identifier is not unique across forces.
@@ -13,7 +13,7 @@ pub struct Neighbourhood {
 }
 
 /// Detailed information about a specific neighbourhood.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeighbourhoodDetail {
     /// Force-specific neighbourhood identifier.
     pub id: String,
@@ -36,7 +36,7 @@ pub struct NeighbourhoodDetail {
 }
 
 /// A latitude/longitude pair as strings (as returned by the API).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LatLng {
     /// Latitude.
     pub latitude: String,
@@ -45,7 +45,7 @@ pub struct LatLng {
 }
 
 /// A link associated with a neighbourhood.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Link {
     /// Link URL.
     pub url: Option<String>,
@@ -56,7 +56,7 @@ pub struct Link {
 }
 
 /// A location associated with a neighbourhood (e.g. a police station).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeighbourhoodLocation {
     /// Location name.
     pub name: Option<String>,
@@ -78,7 +78,7 @@ pub struct NeighbourhoodLocation {
 }
 
 /// A neighbourhood event (e.g. community meeting, surgery).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeighbourhoodEvent {
     /// Event title.
     pub title: Option<String>,
@@ -98,7 +98,7 @@ pub struct NeighbourhoodEvent {
 }
 
 /// A neighbourhood policing priority.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeighbourhoodPriority {
     /// The issue raised.
     pub issue: Option<String>,
@@ -113,7 +113,7 @@ pub struct NeighbourhoodPriority {
 }
 
 /// Result of locating a neighbourhood by coordinates.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LocateNeighbourhoodResult {
     /// Force identifier.
     pub force: String,

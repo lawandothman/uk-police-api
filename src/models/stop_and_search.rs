@@ -1,9 +1,9 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::crime::Location;
 
 /// Type of stop and search.
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StopAndSearchType {
     #[serde(rename = "Person search")]
     Person,
@@ -14,7 +14,7 @@ pub enum StopAndSearchType {
 }
 
 /// A stop and search record.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StopAndSearch {
     /// Type of search performed.
     #[serde(rename = "type")]
@@ -55,7 +55,7 @@ pub struct StopAndSearch {
 }
 
 /// Outcome identifier returned by the stops-by-force endpoint.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OutcomeObject {
     /// Outcome identifier.
     pub id: Option<String>,

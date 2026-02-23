@@ -4,9 +4,8 @@ An async Rust client for the [UK Police API](https://data.police.uk/docs/).
 
 ## Installation
 
-```toml
-[dependencies]
-uk-police-api = "0.1"
+```sh
+cargo add uk-police-api
 ```
 
 ## Usage

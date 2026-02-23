@@ -1,7 +1,7 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// A summary of a police force.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Force {
     /// Unique force identifier.
     pub id: String,
@@ -10,7 +10,7 @@ pub struct Force {
 }
 
 /// Detailed information about a specific police force.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ForceDetail {
     /// Unique force identifier.
     pub id: String,
@@ -27,7 +27,7 @@ pub struct ForceDetail {
 }
 
 /// A senior officer of a police force.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SeniorOfficer {
     /// Name of the officer.
     pub name: String,
@@ -40,7 +40,7 @@ pub struct SeniorOfficer {
 }
 
 /// Contact details for a senior officer.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContactDetails {
     pub email: Option<String>,
     pub telephone: Option<String>,
@@ -64,7 +64,7 @@ pub struct ContactDetails {
 }
 
 /// A way to engage with a police force (e.g. Twitter, Facebook, website).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EngagementMethod {
     /// The type of engagement method (e.g. "facebook", "twitter", "rss").
     #[serde(rename = "type")]

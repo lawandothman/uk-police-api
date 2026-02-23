@@ -19,12 +19,24 @@ const BASE_URL: &str = "https://data.police.uk/api";
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Clone)]
 pub struct Client {
     http: reqwest::Client,
     base_url: String,
 }
 
 impl Client {
+    async fn handle_response<T: serde::de::DeserializeOwned>(
+        response: reqwest::Response,
+    ) -> Result<T, Error> {
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(Error::Api { status, body });
+        }
+        Ok(response.json().await?)
+    }
+
     fn area_query(area: &Area) -> String {
         match area {
             Area::Point(coord) => format!("lat={}&lng={}", coord.lat, coord.lng),
@@ -47,18 +59,39 @@ impl Client {
         }
     }
 
+    /// Creates a client with a pre-configured [`reqwest::Client`].
+    ///
+    /// Use this to customize timeouts, headers, proxies, or any other HTTP
+    /// behaviour.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// let http = reqwest::Client::builder()
+    ///     .timeout(std::time::Duration::from_secs(10))
+    ///     .build()
+    ///     .unwrap();
+    /// let client = uk_police_api::Client::from_http_client(http);
+    /// ```
+    pub fn from_http_client(http: reqwest::Client) -> Self {
+        Self {
+            http,
+            base_url: BASE_URL.to_string(),
+        }
+    }
+
     /// Returns a list of all police forces.
     pub async fn forces(&self) -> Result<Vec<Force>, Error> {
         let url = format!("{}/forces", self.base_url);
-        let forces = self.http.get(&url).send().await?.json().await?;
-        Ok(forces)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns details for a specific police force.
     pub async fn force(&self, id: &str) -> Result<ForceDetail, Error> {
         let url = format!("{}/forces/{}", self.base_url, id);
-        let force = self.http.get(&url).send().await?.json().await?;
-        Ok(force)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns a list of crime categories. Optionally filtered by date (format: `YYYY-MM`).
@@ -67,8 +100,8 @@ impl Client {
         if let Some(date) = date {
             url.push_str(&format!("?date={date}"));
         }
-        let categories = self.http.get(&url).send().await?.json().await?;
-        Ok(categories)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns street-level crimes within a given area.
@@ -93,8 +126,8 @@ impl Client {
         if let Some(date) = date {
             url.push_str(&format!("&date={date}"));
         }
-        let crimes = self.http.get(&url).send().await?.json().await?;
-        Ok(crimes)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns street-level outcomes at a given location.
@@ -116,22 +149,22 @@ impl Client {
         if let Some(date) = date {
             url.push_str(&format!("&date={date}"));
         }
-        let outcomes = self.http.get(&url).send().await?.json().await?;
-        Ok(outcomes)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns the date when crime data was last updated.
     pub async fn crime_last_updated(&self) -> Result<CrimeLastUpdated, Error> {
         let url = format!("{}/crime-last-updated", self.base_url);
-        let updated = self.http.get(&url).send().await?.json().await?;
-        Ok(updated)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns a list of senior officers for a given force.
     pub async fn senior_officers(&self, force_id: &str) -> Result<Vec<SeniorOfficer>, Error> {
         let url = format!("{}/forces/{}/people", self.base_url, force_id);
-        let officers = self.http.get(&url).send().await?.json().await?;
-        Ok(officers)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns crimes at a specific location.
@@ -152,8 +185,8 @@ impl Client {
         if let Some(date) = date {
             url.push_str(&format!("&date={date}"));
         }
-        let crimes = self.http.get(&url).send().await?.json().await?;
-        Ok(crimes)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns crimes that could not be mapped to a location.
@@ -176,8 +209,8 @@ impl Client {
         if let Some(date) = date {
             url.push_str(&format!("&date={date}"));
         }
-        let crimes = self.http.get(&url).send().await?.json().await?;
-        Ok(crimes)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns all outcomes for a specific crime.
@@ -187,15 +220,15 @@ impl Client {
     /// * `persistent_id` - The 64-character crime identifier.
     pub async fn outcomes_for_crime(&self, persistent_id: &str) -> Result<CrimeOutcomes, Error> {
         let url = format!("{}/outcomes-for-crime/{}", self.base_url, persistent_id);
-        let outcomes = self.http.get(&url).send().await?.json().await?;
-        Ok(outcomes)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns a list of neighbourhoods for a force.
     pub async fn neighbourhoods(&self, force_id: &str) -> Result<Vec<Neighbourhood>, Error> {
         let url = format!("{}/{}/neighbourhoods", self.base_url, force_id);
-        let neighbourhoods = self.http.get(&url).send().await?.json().await?;
-        Ok(neighbourhoods)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns details for a specific neighbourhood.
@@ -205,8 +238,8 @@ impl Client {
         neighbourhood_id: &str,
     ) -> Result<NeighbourhoodDetail, Error> {
         let url = format!("{}/{}/{}", self.base_url, force_id, neighbourhood_id);
-        let detail = self.http.get(&url).send().await?.json().await?;
-        Ok(detail)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns the boundary of a neighbourhood as a list of lat/lng pairs.
@@ -219,8 +252,8 @@ impl Client {
             "{}/{}/{}/boundary",
             self.base_url, force_id, neighbourhood_id
         );
-        let boundary = self.http.get(&url).send().await?.json().await?;
-        Ok(boundary)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns the policing team for a neighbourhood.
@@ -230,8 +263,8 @@ impl Client {
         neighbourhood_id: &str,
     ) -> Result<Vec<SeniorOfficer>, Error> {
         let url = format!("{}/{}/{}/people", self.base_url, force_id, neighbourhood_id);
-        let team = self.http.get(&url).send().await?.json().await?;
-        Ok(team)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns events for a neighbourhood.
@@ -241,8 +274,8 @@ impl Client {
         neighbourhood_id: &str,
     ) -> Result<Vec<NeighbourhoodEvent>, Error> {
         let url = format!("{}/{}/{}/events", self.base_url, force_id, neighbourhood_id);
-        let events = self.http.get(&url).send().await?.json().await?;
-        Ok(events)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns policing priorities for a neighbourhood.
@@ -255,8 +288,8 @@ impl Client {
             "{}/{}/{}/priorities",
             self.base_url, force_id, neighbourhood_id
         );
-        let priorities = self.http.get(&url).send().await?.json().await?;
-        Ok(priorities)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Locates the neighbourhood policing team responsible for a given point.
@@ -266,8 +299,8 @@ impl Client {
         lng: f64,
     ) -> Result<LocateNeighbourhoodResult, Error> {
         let url = format!("{}/locate-neighbourhood?q={},{}", self.base_url, lat, lng);
-        let result = self.http.get(&url).send().await?.json().await?;
-        Ok(result)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns stop and searches within a given area.
@@ -285,8 +318,8 @@ impl Client {
         if let Some(date) = date {
             url.push_str(&format!("&date={date}"));
         }
-        let stops = self.http.get(&url).send().await?.json().await?;
-        Ok(stops)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns stop and searches at a specific location.
@@ -307,8 +340,8 @@ impl Client {
         if let Some(date) = date {
             url.push_str(&format!("&date={date}"));
         }
-        let stops = self.http.get(&url).send().await?.json().await?;
-        Ok(stops)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns stop and searches that could not be mapped to a location.
@@ -326,8 +359,8 @@ impl Client {
         if let Some(date) = date {
             url.push_str(&format!("&date={date}"));
         }
-        let stops = self.http.get(&url).send().await?.json().await?;
-        Ok(stops)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 
     /// Returns stop and searches reported by a force.
@@ -345,8 +378,8 @@ impl Client {
         if let Some(date) = date {
             url.push_str(&format!("&date={date}"));
         }
-        let stops = self.http.get(&url).send().await?.json().await?;
-        Ok(stops)
+        let response = self.http.get(&url).send().await?;
+        Self::handle_response(response).await
     }
 }
 
@@ -1149,5 +1182,71 @@ mod tests {
             stops[0].outcome_object.as_ref().unwrap().name,
             Some("Arrest".to_string())
         );
+    }
+
+    #[tokio::test]
+    async fn test_not_found() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/forces/nonexistent"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("Not Found"))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let err = client.force("nonexistent").await.unwrap_err();
+
+        match err {
+            Error::Api { status, body } => {
+                assert_eq!(status, 404);
+                assert_eq!(body, "Not Found");
+            }
+            other => panic!("expected Error::Api, got: {other}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_rate_limited() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/forces"))
+            .respond_with(ResponseTemplate::new(429).set_body_string("Rate limit exceeded"))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let err = client.forces().await.unwrap_err();
+
+        match err {
+            Error::Api { status, body } => {
+                assert_eq!(status, 429);
+                assert_eq!(body, "Rate limit exceeded");
+            }
+            other => panic!("expected Error::Api, got: {other}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_bad_request() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/crime-categories"))
+            .respond_with(ResponseTemplate::new(400).set_body_string("Bad Request"))
+            .mount(&server)
+            .await;
+
+        let client = test_client(&server.uri());
+        let err = client.crime_categories(None).await.unwrap_err();
+
+        match err {
+            Error::Api { status, body } => {
+                assert_eq!(status, 400);
+                assert_eq!(body, "Bad Request");
+            }
+            other => panic!("expected Error::Api, got: {other}"),
+        }
     }
 }

@@ -1,14 +1,14 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// A latitude/longitude pair.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Coordinate {
     pub lat: f64,
     pub lng: f64,
 }
 
 /// A geographic area to search for crimes or outcomes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Area {
     /// Search within a 1 mile radius of a point.
     Point(Coordinate),
@@ -19,7 +19,7 @@ pub enum Area {
 }
 
 /// A category of crime (e.g. "Burglary", "Drugs").
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrimeCategory {
     /// Category identifier (slug format, e.g. "anti-social-behaviour").
     pub url: String,
@@ -28,7 +28,7 @@ pub struct CrimeCategory {
 }
 
 /// The date when crime data was last updated
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrimeLastUpdated {
     /// Month of the latest crime data in ISO date format.
     /// The day is irrelevant and is only there to keep a standard formatted date.
@@ -36,7 +36,7 @@ pub struct CrimeLastUpdated {
 }
 
 /// A crime record.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Crime {
     /// Crime category (e.g. "anti-social-behaviour", "burglary").
     pub category: String,
@@ -59,7 +59,7 @@ pub struct Crime {
 }
 
 /// Approximate location of a crime.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Location {
     /// Latitude.
     pub latitude: String,
@@ -70,7 +70,7 @@ pub struct Location {
 }
 
 /// A street associated with a crime location.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Street {
     /// Unique identifier for the street.
     pub id: u64,
@@ -79,7 +79,7 @@ pub struct Street {
 }
 
 /// The latest outcome of a crime.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OutcomeStatus {
     /// Category of the outcome.
     pub category: OutcomeCategory,
@@ -89,7 +89,7 @@ pub struct OutcomeStatus {
 
 /// Outcome category. Deserializes from both kebab-case codes (e.g. "local-resolution")
 /// and full names (e.g. "Local resolution") as different API endpoints use different formats.
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OutcomeCategory {
     #[serde(rename = "awaiting-court-result", alias = "Awaiting court outcome")]
     AwaitingCourtResult,
@@ -205,7 +205,7 @@ pub enum OutcomeCategory {
 
 /// Outcome category detail object returned by outcome endpoints.
 /// Contains both the machine-readable code and human-readable name.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OutcomeDetail {
     /// Machine-readable category code.
     pub code: OutcomeCategory,
@@ -214,7 +214,7 @@ pub struct OutcomeDetail {
 }
 
 /// A street-level outcome record.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Outcome {
     /// The outcome category.
     pub category: OutcomeDetail,
@@ -227,7 +227,7 @@ pub struct Outcome {
 }
 
 /// All outcomes for a specific crime.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrimeOutcomes {
     /// The crime.
     pub crime: Crime,
@@ -236,7 +236,7 @@ pub struct CrimeOutcomes {
 }
 
 /// An individual outcome within a [`CrimeOutcomes`] response.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrimeOutcome {
     /// The outcome category.
     pub category: OutcomeDetail,
