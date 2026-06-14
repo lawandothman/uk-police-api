@@ -128,7 +128,8 @@ pub enum OutcomeCategory {
     DrugsPossessionWarning,
     #[serde(
         rename = "penalty-notice-issued",
-        alias = "Offender given a penalty notice"
+        alias = "Offender given a penalty notice",
+        alias = "Offender given penalty notice"
     )]
     PenaltyNoticeIssued,
     #[serde(
@@ -201,6 +202,13 @@ pub enum OutcomeCategory {
         alias = "Status update unavailable"
     )]
     StatusUpdateUnavailable,
+    /// Any outcome category not recognised by this client.
+    ///
+    /// The police API occasionally adds or rewords outcome categories. This
+    /// catch-all keeps deserialization from failing on a value the client does
+    /// not yet recognise.
+    #[serde(other)]
+    Unknown,
 }
 
 /// Outcome category detail object returned by outcome endpoints.
