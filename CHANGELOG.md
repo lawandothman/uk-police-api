@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/lawandothman/uk-police-api/compare/v0.4.1...v0.5.0) - 2026-06-14
+
+### Fixed
+
+- tolerate unknown and reworded outcome categories
+
 ## [0.4.1](https://github.com/lawandothman/uk-police-api/compare/v0.4.0...v0.4.1) - 2026-02-23
 
 ### Other
